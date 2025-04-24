@@ -5,8 +5,9 @@
   "main": "index.html",
   "scripts": {
     "start": "serve .",
+    "dev": "serve .",
     "build": "echo 'No build step required for static site'",
-    "test": "echo 'No tests configured'"
+    "vercel-build": "echo 'No build step required for static site'"
   },
   "keywords": [
     "energy",
@@ -18,5 +19,8 @@
   "license": "MIT",
   "devDependencies": {
     "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.x"
   }
 }
