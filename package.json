@@ -5,8 +5,8 @@
   "main": "index.html",
   "scripts": {
     "start": "serve .",
+    "dev": "serve .",
     "build": "echo 'No build step required for static site'",
-    "test": "echo 'No tests configured'",
     "vercel-build": "echo 'No build step required for static site'"
   },
   "keywords": [
