@@ -1,15 +1,22 @@
 {
   "name": "remus-energy",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Remus Energy Back Office - Electricity Supply Management",
+  "main": "index.html",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "serve .",
+    "build": "echo 'No build step required for static site'",
+    "test": "echo 'No tests configured'"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "energy",
+    "electricity",
+    "management",
+    "dashboard"
+  ],
+  "author": "Remus Energy",
+  "license": "MIT",
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "serve": "^14.2.1"
   }
 }
