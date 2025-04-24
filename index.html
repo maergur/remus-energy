@@ -1,0 +1,672 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Remus Energy Back Office, Electricity Supply Management">
+  <title>Remus Energy Back Office</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
+  <link
+    rel="stylesheet"
+    as="style"
+    onload="this.rel='stylesheet'"
+    href="https://fonts.googleapis.com/css2?display=swap&family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&family=Public+Sans%3Awght%40400%3B500%3B700%3B900"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.9/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Mock local storage for demo (simulating CRM, notifications, activity logs, and reports)
+    const mockStorage = {
+      users: [
+        { email: "manager@remusenergy.com", password: "password123", role: "manager" },
+        { email: "admin@remusenergy.com", password: "password123", role: "admin" },
+      ],
+      customers: JSON.parse(localStorage.getItem("customers")) || [],
+      specialPricingRequests: JSON.parse(localStorage.getItem("specialPricingRequests")) || [],
+      notifications: JSON.parse(localStorage.getItem("notifications")) || [],
+      activityLog: JSON.parse(localStorage.getItem("activityLog")) || [],
+      reports: JSON.parse(localStorage.getItem("reports")) || [],
+    };
+
+    // Main App Component
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [currentPage, setCurrentPage] = useState("dashboard");
+      const [theme, setTheme] = useState("light");
+
+      useEffect(() => {
+        // Mock notifications for demo
+        const notifications = [
+          { id: 1, message: "Special Pricing Request Sent for Customer A", date: "2025-04-24" },
+          { id: 2, message: "Contract Renewal Reminder: Customer B (15 days)", date: "2025-04-24" },
+        ];
+        localStorage.setItem("notifications", JSON.stringify(notifications));
+
+        // Mock activity log for demo
+        const activityLog = [
+          { id: 1, action: "User logged in", user: "manager@remusenergy.com", timestamp: "2025-04-24 10:00" },
+          { id: 2, action: "Special Pricing Requested", user: "manager@remusenergy.com", timestamp: "2025-04-24 09:30" },
+        ];
+        localStorage.setItem("activityLog", JSON.stringify(activityLog));
+
+        // Mock reports for demo
+        const reports = [
+          { id: 1, title: "April 2025 Energy Usage", generatedDate: "2025-04-24", consumption: "1,340 kWh", production: "2,000 kWh" },
+        ];
+        localStorage.setItem("reports", JSON.stringify(reports));
+      }, []);
+
+      const toggleTheme = () => {
+        setTheme(theme === "light" ? "dark" : "light");
+      };
+
+      if (!user) {
+        return <Login setUser={setUser} theme={theme} />;
+      }
+
+      return (
+        <div className={`relative flex size-full min-h-screen flex-col ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-[#111418]"}`} style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}>
+          <div className="layout-container flex h-full grow flex-col">
+            <TopBar toggleTheme={toggleTheme} theme={theme} user={user} setUser={setUser} setCurrentPage={setCurrentPage} />
+            <div className="gap-1 px-6 flex flex-1 justify-center py-5">
+              <Sidebar setCurrentPage={setCurrentPage} theme={theme} />
+              <div className="layout-content-container flex flex-col max-w-[960px] flex-1">
+                <div className="flex flex-wrap justify-between gap-3 p-4">
+                  <p className="tracking-tight text-[32px] font-bold leading-tight min-w-72">Dashboard</p>
+                </div>
+                {currentPage === "dashboard" && <Dashboard user={user} theme={theme} />}
+                {currentPage === "pricing" && <Pricing theme={theme} />}
+                {currentPage === "sales-portal" && <SalesManagerDealerPortal theme={theme} />}
+                {currentPage === "admin-portal" && user.role === "admin" && <AdminPortal theme={theme} />}
+                {currentPage === "reports" && <Reports theme={theme} />}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Top Bar Component (Styled like Galileo Design Header)
+    const TopBar = ({ toggleTheme, theme, user, setUser, setCurrentPage }) => {
+      const [showSettings, setShowSettings] = useState(false);
+
+      return (
+        <header className={`flex items-center justify-between whitespace-nowrap border-b border-solid ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-[#f0f2f4] bg-white"} px-10 py-3`}>
+          <div className="flex items-center gap-4">
+            <div className="size-4">
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" clipRule="evenodd" d="M24 4H42V17.3333V30.6667H24V44H6V30.6667V17.3333H24V4Z" fill="currentColor"></path>
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold leading-tight tracking-[-0.015em]">Remus Energy</h2>
+          </div>
+          <div className="flex flex-1 justify-end gap-8">
+            <div className="flex items-center gap-9">
+              <button
+                onClick={() => setCurrentPage("dashboard")}
+                className="text-sm font-medium leading-normal"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setCurrentPage("pricing")}
+                className="text-sm font-medium leading-normal"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() => setCurrentPage("sales-portal")}
+                className="text-sm font-medium leading-normal"
+              >
+                Sales Portal
+              </button>
+              <button
+                onClick={() => setCurrentPage("admin-portal")}
+                className="text-sm font-medium leading-normal"
+              >
+                Admin Portal
+              </button>
+              <button
+                onClick={() => setCurrentPage("reports")}
+                className="text-sm font-medium leading-normal"
+              >
+                Reports
+              </button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <button
+                className={`flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 ${theme === "dark" ? "bg-gray-700 text-white" : "bg-[#f0f2f4] text-[#111418]"} gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5`}
+                onClick={toggleTheme}
+              >
+                {theme === "light" ? "Dark Mode" : "Light Mode"}
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className={`flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 ${theme === "dark" ? "bg-gray-700 text-white" : "bg-[#f0f2f4] text-[#111418]"} gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5`}
+                >
+                  Settings
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                {showSettings && (
+                  <div className={`absolute right-0 mt-2 w-48 ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-[#111418]"} rounded shadow-lg border border-[#dce0e5]`}>
+                    <button className={`block w-full text-left p-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-[#f0f2f4]"}`}>Profile</button>
+                    <button className={`block w-full text-left p-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-[#f0f2f4]"}`}>Preferences</button>
+                    <button
+                      onClick={() => setUser(null)}
+                      className={`block w-full text-left p-2 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-[#f0f2f4]"}`}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"
+                style={{ backgroundImage: 'url("https://cdn.usegalileo.ai/sdxl10/392e50f7-dc27-4277-9efd-6b394180a3ad.png")' }}
+              ></div>
+            </div>
+          </div>
+        </header>
+      );
+    };
+
+    // Sidebar Component (Styled like Galileo Design Sidebar)
+    const Sidebar = ({ setCurrentPage, theme }) => (
+      <div className="layout-content-container flex flex-col w-80">
+        <div className={`flex h-full min-h-[700px] flex-col justify-between ${theme === "dark" ? "bg-gray-800" : "bg-white"} p-4`}>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setCurrentPage("dashboard")}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl ${theme === "dark" ? "bg-gray-700 text-white" : "bg-[#f0f2f4] text-[#111418]"}`}
+              >
+                <p className="text-sm font-medium leading-normal">Overview</p>
+              </button>
+              <button
+                onClick={() => setCurrentPage("pricing")}
+                className={`flex items-center gap-3 px-3 py-2 ${theme === "dark" ? "text-white hover:bg-gray-700" : "text-[#111418] hover:bg-[#f0f2f4]"}`}
+              >
+                <p className="text-sm font-medium leading-normal">Prices</p>
+              </button>
+              <button
+                onClick={() => setCurrentPage("sales-portal")}
+                className={`flex items-center gap-3 px-3 py-2 ${theme === "dark" ? "text-white hover:bg-gray-700" : "text-[#111418] hover:bg-[#f0f2f4]"}`}
+              >
+                <p className="text-sm font-medium leading-normal">Customers</p>
+              </button>
+              <button
+                onClick={() => setCurrentPage("admin-portal")}
+                className={`flex items-center gap-3 px-3 py-2 ${theme === "dark" ? "text-white hover:bg-gray-700" : "text-[#111418] hover:bg-[#f0f2f4]"}`}
+              >
+                <p className="text-sm font-medium leading-normal">Contracts</p>
+              </button>
+              <button
+                onClick={() => setCurrentPage("reports")}
+                className={`flex items-center gap-3 px-3 py-2 ${theme === "dark" ? "text-white hover:bg-gray-700" : "text-[#111418] hover:bg-[#f0f2f4]"}`}
+              >
+                <p className="text-sm font-medium leading-normal">Reports</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Login Component
+    const Login = ({ setUser, theme }) => {
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [error, setError] = useState("");
+
+      const handleLogin = () => {
+        const foundUser = mockStorage.users.find(
+          (u) => u.email === email && u.password === password
+        );
+        if (foundUser) {
+          setUser(foundUser);
+        } else {
+          setError("Invalid email or password");
+        }
+      };
+
+      return (
+        <div className={`relative flex size-full min-h-screen flex-col ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-[#111418]"}`} style={{ fontFamily: '"Public Sans", "Noto Sans", sans-serif' }}>
+          <div className="layout-container flex h-full grow flex-col">
+            <div className="gap-1 px-6 flex flex-1 justify-center py-5">
+              <div className="layout-content-container flex flex-col max-w-[960px] flex-1">
+                <div className="flex flex-wrap justify-between gap-3 p-4">
+                  <p className="tracking-tight text-[32px] font-bold leading-tight min-w-72">Login to Remus Energy</p>
+                </div>
+                <div className={`p-6 rounded-xl border border-[#dce0e5] ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full p-2 mb-4 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full p-2 mb-4 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                  />
+                  {error && <p className="text-red-500 mb-4 text-sm font-medium leading-normal">{error}</p>}
+                  <button
+                    onClick={handleLogin}
+                    className={`w-full p-2 rounded-xl ${theme === "dark" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-[#f0f2f4] text-[#111418] hover:bg-[#e5e7e9]"} text-sm font-bold leading-normal tracking-[0.015em]`}
+                  >
+                    Login
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Dashboard Component
+    const Dashboard = ({ user, theme }) => {
+      const notifications = JSON.parse(localStorage.getItem("notifications")) || [];
+      const activityLog = JSON.parse(localStorage.getItem("activityLog")) || [];
+
+      return (
+        <div>
+          <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Remus Energy</h3>
+          <div className="flex flex-wrap gap-4 p-4">
+            <div className={`flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 ${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+              <p className="text-base font-medium leading-normal">Customer Count</p>
+              <p className="tracking-tight text-2xl font-bold leading-tight">1,340</p>
+            </div>
+            <div className={`flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 ${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+              <p className="text-base font-medium leading-normal">Active Contracts</p>
+              <p className="tracking-tight text-2xl font-bold leading-tight">2,000</p>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col items-start justify-between gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <div className="flex flex-col gap-1">
+                <p className="text-base font-bold leading-tight">Energy Prices</p>
+                <p className={`${theme === "dark" ? "text-gray-400" : "text-[#637288]"} text-base font-normal leading-normal`}>View and manage energy prices</p>
+              </div>
+              <button
+                onClick={() => window.location.href = "#pricing"}
+                className="text-sm font-bold leading-normal tracking-[0.015em] flex gap-2"
+              >
+                View Energy Prices
+                <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col items-start justify-between gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <div className="flex flex-col gap-1">
+                <p className="text-base font-bold leading-tight">Special Pricing</p>
+                <p className={`${theme === "dark" ? "text-gray-400" : "text-[#637288]"} text-base font-normal leading-normal`}>View and manage special pricing requests</p>
+              </div>
+              <button
+                onClick={() => window.location.href = "#sales-portal"}
+                className="text-sm font-bold leading-normal tracking-[0.015em] flex gap-2"
+              >
+                View Special Pricing
+                <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col items-start justify-between gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <div className="flex flex-col gap-1">
+                <p className="text-base font-bold leading-tight">EPİAŞ</p>
+                <p className={`${theme === "dark" ? "text-gray-400" : "text-[#637288]"} text-base font-normal leading-normal`}>Submit required information to EPİAŞ</p>
+              </div>
+              <button
+                onClick={() => window.location.href = "#admin-portal"}
+                className="text-sm font-bold leading-normal tracking-[0.015em] flex gap-2"
+              >
+                Go to EPİAŞ
+                <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <p className="text-base font-bold leading-tight">Notifications</p>
+              <ul>
+                {notifications.map((notification) => (
+                  <li key={notification.id} className="mb-2 text-sm font-medium leading-normal">
+                    {notification.message} - {notification.date}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <p className="text-base font-bold leading-tight">Recent Activity</p>
+              <ul>
+                {activityLog.map((activity) => (
+                  <li key={activity.id} className="mb-2 text-sm font-medium leading-normal">
+                    {activity.action} by {activity.user} at {activity.timestamp}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`flex flex-1 flex-col gap-4 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"} p-5`}>
+              <p className="text-base font-bold leading-tight">Quick Actions</p>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => window.location.href = "#sales-portal"}
+                  className="text-sm font-bold leading-normal tracking-[0.015em] flex gap-2"
+                >
+                  Add New Customer
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                    <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"></path>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => window.location.href = "#notifications"}
+                  className="text-sm font-bold leading-normal tracking-[0.015em] flex gap-2"
+                >
+                  View All Notifications
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                    <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Pricing Component
+    const Pricing = ({ theme }) => (
+      <div>
+        <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Pricing</h3>
+        <div className="p-4">
+          <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+            <h4 className="text-base font-bold leading-tight mb-4">Standard Retail Prices for April 2025</h4>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+                  <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Customer Type</th>
+                  <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Price per kWh</th>
+                  <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Effective Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Residential</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">0.45</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">2025-04-01</td>
+                </tr>
+                <tr>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Commercial</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">0.55</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">2025-04-01</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="p-4">
+          <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+            <h4 className="text-base font-bold leading-tight mb-4">Price Comparison (Low-Consumption Customers)</h4>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+                  <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Provider</th>
+                  <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Price per kWh</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Remus Energy</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">0.45</td>
+                </tr>
+                <tr>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Competitor</td>
+                  <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">0.50</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Sales Manager/Dealer Portal Component
+    const SalesManagerDealerPortal = ({ theme }) => {
+      const [customerData, setCustomerData] = useState({
+        name: "",
+        contact: "",
+        consumption: "",
+        notes: "",
+        renewalDate: "",
+      });
+      const [customers, setCustomers] = useState(mockStorage.customers);
+
+      const handleInputChange = (e) => {
+        setCustomerData({ ...customerData, [e.target.name]: e.target.value });
+      };
+
+      const handleSubmit = () => {
+        const newCustomers = [...customers, customerData];
+        setCustomers(newCustomers);
+        localStorage.setItem("customers", JSON.stringify(newCustomers));
+        setCustomerData({ name: "", contact: "", consumption: "", notes: "", renewalDate: "" });
+      };
+
+      const handleSpecialPricingRequest = () => {
+        const request = { customer: customerData.name, requestedPrice: "0.40", status: "Pending" };
+        const requests = [...mockStorage.specialPricingRequests, request];
+        localStorage.setItem("specialPricingRequests", JSON.stringify(requests));
+        alert("Special Pricing Request Sent. Awaiting Approval.");
+      };
+
+      return (
+        <div>
+          <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Sales Manager/Dealer Portal</h3>
+          <div className="p-4">
+            <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+              <h4 className="text-base font-bold leading-tight mb-4">Add Customer Data</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Customer Name"
+                  value={customerData.name}
+                  onChange={handleInputChange}
+                  className={`p-2 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                />
+                <input
+                  type="text"
+                  name="contact"
+                  placeholder="Contact Info"
+                  value={customerData.contact}
+                  onChange={handleInputChange}
+                  className={`p-2 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                />
+                <input
+                  type="text"
+                  name="consumption"
+                  placeholder="Consumption Data (kWh)"
+                  value={customerData.consumption}
+                  onChange={handleInputChange}
+                  className={`p-2 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                />
+                <input
+                  type="text"
+                  name="notes"
+                  placeholder="Notes"
+                  value={customerData.notes}
+                  onChange={handleInputChange}
+                  className={`p-2 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                />
+                <input
+                  type="date"
+                  name="renewalDate"
+                  placeholder="Contract Renewal Date"
+                  value={customerData.renewalDate}
+                  onChange={handleInputChange}
+                  className={`p-2 border rounded ${theme === "dark" ? "bg-gray-700 text-white border-gray-600" : "bg-white text-[#111418] border-[#dce0e5]"} text-sm font-medium leading-normal`}
+                />
+              </div>
+              <div className="flex space-x-4 mt-4">
+                <button
+                  onClick={handleSubmit}
+                  className={`p-2 rounded-xl ${theme === "dark" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-[#f0f2f4] text-[#111418] hover:bg-[#e5e7e9]"} text-sm font-bold leading-normal tracking-[0.015em]`}
+                >
+                  Save Customer Data
+                </button>
+                <button
+                  onClick={handleSpecialPricingRequest}
+                  className={`p-2 rounded-xl ${theme === "dark" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-[#f0f2f4] text-[#111418] hover:bg-[#e5e7e9]"} text-sm font-bold leading-normal tracking-[0.015em]`}
+                >
+                  Request Special Pricing
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="p-4">
+            <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+              <h4 className="text-base font-bold leading-tight mb-4">Customer List</h4>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Name</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Contact</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Consumption (kWh)</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Renewal Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((customer, index) => (
+                    <tr key={index}>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{customer.name}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{customer.contact}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{customer.consumption}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{customer.renewalDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Admin Portal Component
+    const AdminPortal = ({ theme }) => (
+      <div>
+        <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Admin Portal</h3>
+        <div className="p-4">
+          <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+            <h4 className="text-base font-bold leading-tight mb-4">Special Pricing Requests</h4>
+            <p className="text-sm font-medium leading-normal">Admin features like approving special pricing and EPİAŞ submissions would go here.</p>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Reports Component
+    const Reports = ({ theme }) => {
+      const reports = JSON.parse(localStorage.getItem("reports")) || [];
+
+      return (
+        <div>
+          <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Reports</h3>
+          <div className="p-4">
+            <div className={`p-6 rounded-xl border ${theme === "dark" ? "border-gray-600 bg-gray-800" : "border-[#dce0e5] bg-white"}`}>
+              <h4 className="text-base font-bold leading-tight mb-4">Generated Reports</h4>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-[#f0f2f4]"}`}>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Report Title</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Generated Date</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Consumption</th>
+                    <th className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">Production</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((report) => (
+                    <tr key={report.id}>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{report.title}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{report.generatedDate}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{report.consumption}</td>
+                      <td className="border border-[#dce0e5] p-2 text-sm font-medium leading-normal">{report.production}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Render the App
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
